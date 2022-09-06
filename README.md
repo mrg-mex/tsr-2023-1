@@ -248,8 +248,6 @@ o en caso de tratarse de un equipo
 | Iniciales  | Description |
 | ----------:| ----------- |
 | **RICF** | Felipe Rivas Campos [GitHub profile](https://github.com/rivascf) |
-| **EPM**  | Erik Peña Medina [GitHub profile](https://github.com/ErikFiUNAM) |
-| **MGR-MX** | Mechatronics Research Group, México [GitHub profile](https://github.com/mrg-mx) |
 
 ## Referencias
 

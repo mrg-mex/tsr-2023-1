@@ -256,7 +256,7 @@ Se pueden agregar notas al pie (cómo pudiste notar en las líneas marcadas como
 ```text
 Esta es una nota al pie sencilla[^1].
 
-Una nota al pie también puede tener múltiples líneas multiple lines[^2].  
+Una nota al pie también puede tener múltiples líneas[^2].  
 
 También puede usar palabras, para adaptarse mejor a su estilo de escritura.[^nota].
 

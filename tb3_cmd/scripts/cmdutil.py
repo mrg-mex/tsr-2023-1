@@ -13,7 +13,7 @@ from unittest import result
 
 re_pattern = r'(^[a-zA-Z]+)|([-.0-9]+)'
 CTRL_C_CHAR = '\x03'
-CR_CHAR = '\r'
+CR_CHAR = '\r' # CR \r + LF 
 ESC_CHAR = chr(27)
 BACKSPC_CHAR = chr(127)
 

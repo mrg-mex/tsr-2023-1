@@ -26,14 +26,14 @@ def main():
             elif key == cmdutil.CR_CHAR:
                 if input_string != '':
                     result_cmd = cmdutil.parseCommand(input_string)
-                    if result_cmd[0] != '':
+                    if len(result_cmd) > 0 and result_cmd[0] != '':
                         if result_cmd[0].lower() == 'terminar':
                             break
                         else:
                             cmd_msg.comando = result_cmd[0]
                             cmd_msg.valor = float(result_cmd[1])
 
-                        print('comando: %s valor: %.2f' % (result_cmd[0], float(result_cmd[1])))
+                        print('\ncomando: %s valor: %.2f' % (result_cmd[0], float(result_cmd[1])))
 
                     input_string = ''    
 
@@ -46,6 +46,9 @@ def main():
 
     except rospy.ROSInterruptException as e:
         print(e)
+
+    except Exception as ex:
+        print(ex)
 
 if __name__ == '__main__':
     main()

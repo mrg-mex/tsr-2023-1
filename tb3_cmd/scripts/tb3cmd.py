@@ -25,18 +25,32 @@ class TB3CmdListener(object):
 
     def loadParameters(self):
         self._model = rospy.get_param("tb3_model", "burger")
-        if self._model == 'waffle':
-            self._max_vel_lin = rospy.get_param("tb3_max_lin_vel", self.WAFFLE_MAX_LIN_VEL)
-            self._max_vel_ang = rospy.get_param("tb3_max_lin_vel", self.WAFFLE_MAX_ANG_VEL)
+        if rospy.has_param('/tb3_cmd/angular/inc'):
+            rospy.loginfo("parametros definidos:")
+        if self._model == 'waffle' or self._model == 'waffle_pi':
+            self._max_vel_lin = rospy.get_param("/tb3_cmd/lineal/max", self.WAFFLE_MAX_LIN_VEL)
+            self._max_vel_ang = rospy.get_param("/tb3_cmd/angular/max", self.WAFFLE_MAX_ANG_VEL)
+            self._min_vel_lin = rospy.get_param("/tb3_cmd/lineal/min", 0.001)
+            self._min_vel_ang = rospy.get_param("/tb3_cmd/angular/min", 0.01)
         else:
-            self._max_vel_lin = rospy.get_param("tb3_max_lin_vel", self.BURGUER_MAX_LIN_VEL)
-            self._max_vel_ang = rospy.get_param("tb3_max_lin_vel", self.BURGUER_MAX_ANG_VEL)
+            self._max_vel_lin = rospy.get_param("/tb3_cmd/lineal/max", self.BURGUER_MAX_LIN_VEL)
+            self._max_vel_ang = rospy.get_param("/tb3_cmd/angular/max", self.BURGUER_MAX_ANG_VEL)
+            self._min_vel_lin = rospy.get_param("/tb3_cmd/lineal/min", 0.001)
+            self._min_vel_ang = rospy.get_param("/tb3_cmd/angular/min", 0.01)
+
+        self.LIN_VEL_INC = rospy.get_param("/tb3_cmd/lineal/inc", 0.005)
+        self.ANG_VEL_INC = rospy.get_param("/tb3_cmd/angular/inc", 0.05)
+
+        rospy.loginfo(f"Valores cargados: vlmax={self._max_vel_lin}, vlmin={self._min_vel_lin}, vamax={self._max_vel_ang}, vamin={self._min_vel_ang}, inc=({self.LIN_VEL_INC}, {self.ANG_VEL_INC})")
+
 
     def _constraint(self, input_value, low, high):
         if input_value < low:
             input_value = low
+            rospy.logwarn(f"Warning: value {input_value} too low, using default low ({low}) value instead.")
         elif input_value > high:
             input_value = high
+            rospy.logwarn(f"Warning: value {input_value} too high, using default high ({high}) value instead.")
         else:
             input_value = input_value
 
@@ -64,39 +78,52 @@ class TB3CmdListener(object):
     def _on_tb3cmd_clbk(self, msg):
         self._cdmmsg = msg
         robot_state = Twist()
+        do_it = True
         # Para cualquiera de las velocidades:
         # - Verificar si el valor está en los limites de acuerdo al modelo
         # - Ajustar el valor de acuerdo al limite
-        # - Agregar funciionalidad para incremento fijo de acuerdo al modelo
+        # - Agregar funcionalidad para incremento fijo de acuerdo al modelo
         if not self._cdmmsg is None:
             if self._cdmmsg.comando.lower() == 'avanza':    #'AVANZA', 'Avanza', 'AvAnZa'
                 self._current_lin_vel = self._checkLinearLimitVel(self._cdmmsg.valor)
+            elif self._cdmmsg.comando.lower() == 'gira':  
+                # Tarea: Completar  
+                #   Solucion
+                self._current_ang_vel = self._checkAngularLimitVel(self._cdmmsg.valor)
+            elif self._cdmmsg.comando.lower() == 'detente':    
+                # Tarea: Completar  
+                #   Solucion
+                self._current_lin_vel = 0.0     # self._checkLinearLimitVel(0.0)
+                self._current_ang_vel = 0.0     # self._checkAngularLimitVel(0.0)
+            elif self._cdmmsg.comando.lower() == 'incl':
+                # Tarea: Completar  
+                #   Solucion
+                if self._cdmmsg.valor >= 0:
+                    self._current_lin_vel = self._checkLinearLimitVel(self._current_lin_vel + self.LIN_VEL_INC)
+                else:
+                    self._current_lin_vel = self._checkLinearLimitVel(self._current_lin_vel - self.LIN_VEL_INC)    
+            elif self._cdmmsg.comando.lower() == 'inca':
+                # Tarea: Solucion  
+                #   Solucion
+                if self._cdmmsg.valor >= 0:
+                    self._current_ang_vel = self._checkAngularLimitVel(self._current_ang_vel + self.ANG_VEL_INC)
+                else:
+                    self._current_ang_vel = self._checkAngularLimitVel(self._current_ang_vel - self.ANG_VEL_INC)
+            else:
+                rospy.logwarn('Recibi el comando ({}, {}) -> comando desconocido, el comando fue descartado.'
+                .format(self._cdmmsg.comando, self._cdmmsg.valor))
+                do_it = False
+
+            # Tarea: Solucion  
+            #   Solucion
+            # Ejecuta si es un comando valido
+            if do_it:
                 robot_state.linear.x = self._current_lin_vel
                 robot_state.angular.z = self._current_ang_vel
                 self._cmd_msg_pub.publish(robot_state)
                 rospy.loginfo('Recibi el comando ({}, {}) -> comando enviado.'.format(self._cdmmsg.comando, self._cdmmsg.valor))
                 rospy.loginfo(self.vels(self._current_lin_vel, self._current_ang_vel))
-            elif self._cdmmsg.comando.lower() == 'gira':  
-                # Tarea: Completar  
-                robot_state.linear.x = 0.0
-                robot_state.angular.z = self._cdmmsg.valor
-                self._cmd_msg_pub.publish(robot_state)
-                rospy.loginfo('Recibi el comando ({}, {}) -> comando enviado.'.format(self._cdmmsg.comando, self._cdmmsg.valor))
-            elif self._cdmmsg.comando.lower() == 'detente':    
-                # Tarea: Completar  
-                robot_state.linear.x = 0.0
-                robot_state.angular.z = 0.0
-                self._cmd_msg_pub.publish(robot_state)
-                rospy.loginfo('Recibi el comando ({}, {}) -> comando enviado.'.format(self._cdmmsg.comando, self._cdmmsg.valor))
-            elif self._cdmmsg.comando.lower() == 'incl':
-                # Tarea: Desarrollar  
-                pass
-            elif self._cdmmsg.comando.lower() == 'inca':
-                # Tarea: Desarrollar  
-                pass
-            else:
-                rospy.logwarn('Recibi el comando ({}, {}) -> comando desconocido, descartado.'
-                .format(self._cdmmsg.comando, self._cdmmsg.valor))
+
     
     def loop(self):
         rospy.spin()

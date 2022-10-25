@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+    <rosparam command="load" file="$(find tb3_cmd)/config/tb3cmd_params.yaml"/>
+    <node name="tb3_cmd" pkg="tb3_cmd" type="tb3cmd.py" output="screen"/>
+
+    <include file="$(find turtlebot3_fake)/launch/turtlebot3_fake.launch"/>
+</launch>

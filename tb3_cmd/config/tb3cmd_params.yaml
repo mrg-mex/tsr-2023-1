@@ -1,0 +1,9 @@
+tb3_cmd:
+  lineal:
+    max: 0.25
+    min: 0.0
+    inc: 0.01
+  angular:  
+    max: 1.2
+    min: 0.0
+    inc: 0.1

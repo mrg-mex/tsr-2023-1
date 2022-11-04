@@ -1,0 +1,7 @@
+# Request - peticion que se hace al servidor mediante el servicio
+string object_name
+---
+# Response - datos que devuelve el seridor al atender la peticion (request)
+float64 object_distance
+bool success
+string status_message

@@ -19,6 +19,12 @@ add_message_files(
   TB3CmdMsg.msg
 )
 
+add_service_files(
+  FILES
+  GetClosest.srv
+  GetDistance.srv
+)
+
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES

@@ -1,0 +1,18 @@
+# Goal - Info necesaria para generar una nueva meta (goal)
+std_msgs/Header header
+geometry_msgs/Pose2D target
+---
+# Result - Info necesaria para publicar el resultado exitoso o no del proceso
+std_msgs/Header header
+geometry_msgs/Pose2D position
+string state_name
+float32 distance_error
+float32 yaw_error
+bool success
+string goal_message
+---
+# Feedback - Info de retroalimentacion al cliente durante la ejecusion del proceso
+geometry_msgs/Pose2D position
+string state_name
+float32 distance_error
+float32 yaw_error

@@ -28,7 +28,14 @@ class TB3MoveActionServer():
         # Publicadores y subscriptores
         self._cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         self._odom_sub = rospy.Subscriber('/odom', Odometry, self._on_odometry_update) 
+        # Inicializacion de Simple Action Server
+        self._action_server = actionlib.SimpleActionServer('TB3_Move_server', TB3MoveAction, self._execute, False)
         rospy.loginfo("TB3MoveActionServer: Inicializado")
+
+
+    #######################################################
+    ## Aqui migramos el codigo del script tb3_go2point   ##
+    #######################################################
 
     # 'odom' funcion de callback
     def _on_odometry_update(self, odom_msg):
@@ -57,27 +64,40 @@ class TB3MoveActionServer():
     def _head_towards_goal(self):
         goal_yaw, dist_to_goal = self._compute_goal()
         rospy.loginfo(f'HEADING: Yaw err: {goal_yaw:.6f}, dist to go: {dist_to_goal:.6f}')
+        self._iyaw_error = goal_yaw
+        self._distance_to_goal = dist_to_goal
         if math.fabs(goal_yaw) > self._tol_err_yaw:
             ang_vel = self._ang_vel if goal_yaw > 0 else -self._ang_vel
             # mandar el comando de giro al robot
-            self._send_vel_robot(vel_ang=ang_vel, robot_state='TWIST')
+            self._send_vel_robot(vel_ang=ang_vel, robot_state=1) #robot_state='TWIST'
         else:
-            self._robot_state = 'GO'    
+            self._irobot_state_code = 2       # self._robot_state = 'GO'    
 
     # Desplazamiento hacia la meta
     def _go_staight(self):
         goal_yaw, dist_to_goal = self._compute_goal()    
         rospy.loginfo(f'GO: Yaw err: {goal_yaw:.6f}, dist to go: {dist_to_goal:.6f}')
-        if self._robot_state not in ['GOAL','STOP']:
+        self._iyaw_error = goal_yaw
+        self._distance_to_goal = dist_to_goal
+        if self._irobot_state_code not in [0,3]:        # if self._robot_state not in ['GOAL','STOP']
             if dist_to_goal > self._tol_err_dist:
-                self._send_vel_robot(vel_lin=self._lin_vel, robot_state='GO')
+                self._send_vel_robot(vel_lin=self._lin_vel, robot_state=2) # robot_state='GO'
             else: # Llegamos a la meta
-                self._robot_state = 'GOAL'
+                self._irobot_state_code = 3      # self._robot_state = 'GOAL'
                 rospy.loginfo(f"GOAL!, yaw error: {goal_yaw:.6f}, dist error: {dist_to_goal:.6f}")
                 self._send_vel_robot()
             if math.fabs(goal_yaw) > self._tol_err_yaw:
                 #self._head_towards_goal()    
-                self._robot_state = 'TWIST'
+                self._irobot_state_code = 1     # self._robot_state = 'TWIST'
+
+    def _send_vel_robot(self, vel_ang = 0.0, vel_lin = 0.0, robot_state=0):
+        self._irobot_state_code = robot_state
+        cmd_twist =  Twist()
+        cmd_twist.linear.x = vel_lin
+        cmd_twist.angular.z = vel_ang
+
+        self._cmdvel_pub.publish(cmd_twist)
+
 
     # Funcion para detener al robot
     def _stop_robot(self):
@@ -86,13 +106,107 @@ class TB3MoveActionServer():
         rospy.sleep(1)
         self.self._irobot_state_code = 0
 
+    ############################################################
+    ## Aqui empieza la implementacion de SimpleActionServer   ##
+    ############################################################
+
     # Actionlib callback function
     def _execute(self, goal):
-        pass    
+        success = True  
+        # Recibimos un nuevo GOAL 
+        rospy.loginfo("NEW GOAL received!")
+
+        if not self._accept_goal(goal):
+            rospy.logerr("NEW GOAL abortada.")
+            self._action_server.set_aborted()
+            return
+
+        # NEW GOAL aceptada
+        rospy.loginfo(f"NEW GOAL aceptada, GOAL({self._goal.x},{self._goal.y}, {self._goal.theta})")    
+
+        # Ejecusion del proceso de tb3_go2point
+        # Ciclamos mientras no lleguemos al estado 3 ('GOAL')
+        while not self._irobot_state_code == 3:
+            if self._action_server.is_preempt_requested():
+                success = False
+                rospy.logwarn("PREEMPT flag recibida! Finalizando el proceso para la meta actual.")
+                break
+            if self._irobot_state_code == 1:
+                self._head_towards_goal()
+            elif self._irobot_state_code == 2:
+                self._go_staight()
+            else:
+                success = False
+                rospy.logerr(f"Assert error, irobot state code ({self._irobot_state_code}).")
+                break
+
+            # Al terminar la iteracion envio el feedback al cliente
+            self._send_feedback()
+
+        # Al terminar el ciclo con: 
+        # success = False y el estado actual del robot
+        # o 
+        # success = True y el estado actual del robot == 3 ('GOAL')
+
+        result_msg = self._create_result_msg(success)
+        self._stop_robot()
+        if success:
+            self._action_server.set_succeeded(result_msg)
+            rospy.loginfo("Proceso terminado exitosamente.")
+        else:
+            self._action_server.set_preempted(result_msg)
+            rospy.logwarn("Proceso terminado, GOAL PREEMPTED")
+
+    def _accept_goal(self, new_goal):
+        # Estados del robot
+        #   0        1       2      3
+        # 'STOP', 'TWIST', 'GO', 'GOAL' 
+        if self._irobot_state_code == 0 or self._irobot_state_code == 3:
+            self._irobot_state_code == 2
+            self._goal = new_goal.target
+
+            return True
+
+        rospy.logwarn(f"Estado actual del robot {self._itb3_robot_states[self._irobot_state_code]}. GOAL rechazada!")
+        return False  
+
+    def _send_feedback(self):
+        feedback_msg = TB3MoveFeedback()
+        feedback_msg.position = self._ipose
+        feedback_msg.state_name = self._itb3_robot_states[self._irobot_state_code]
+        feedback_msg.distance_error = self._distance_to_goal
+        feedback_msg.yaw_error = self._iyaw_error
+
+        self._action_server.publish_feedback(feedback_msg)
+
+    def _create_result_msg(self, success):
+        result_msg = TB3MoveResult()
+        result_msg.header = Header()
+        result_msg.header.seq = 1
+        result_msg.header.stamp = rospy.Time.now()
+        result_msg.header.frame_id = ""
+        result_msg.position = self._ipose
+        result_msg.state_name = self._itb3_robot_states[self._irobot_state_code]
+        result_msg.distance_error = self._distance_to_goal
+        result_msg.yaw_error = self._iyaw_error
+        result_msg.success = success
+        # result_msg.goal_message = "GOAL completada exitosamente" if success else "GOAL fallo"
+        if success:
+            result_msg.goal_message = "GOAL completada exitosamente" 
+        else:
+            result_msg.goal_message = "GOAL fallo"
+
+        return result_msg    
+
+    def start(self):
+        self._action_server.start()    
 
 
 def main():
-    pass
+    rospy.init_node('tb3_actionlib_server_node')
+    tb3_actionsrv = TB3MoveActionServer()
+    tb3_actionsrv.start()
+    rospy.spin()
 
 if __name__ == '__main__':
     main()

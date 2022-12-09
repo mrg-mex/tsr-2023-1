@@ -13,7 +13,7 @@ class TB3MoveActionServer():
     def __init__(self):
         # Descripcion actual del robot (Pose, Header)
         self._header = Header()
-        self._ipose = Pose2D #pose actual del robot
+        self._ipose = Pose2D() #pose actual del robot
         # Estados del robot
         self._irobot_state_code = 0
         self._itb3_robot_states = ['STOP', 'TWIST', 'GO', 'GOAL']
@@ -85,7 +85,7 @@ class TB3MoveActionServer():
             else: # Llegamos a la meta
                 self._irobot_state_code = 3      # self._robot_state = 'GOAL'
                 rospy.loginfo(f"GOAL!, yaw error: {goal_yaw:.6f}, dist error: {dist_to_goal:.6f}")
-                self._send_vel_robot()
+                self._send_vel_robot(robot_state=3)
             if math.fabs(goal_yaw) > self._tol_err_yaw:
                 #self._head_towards_goal()    
                 self._irobot_state_code = 1     # self._robot_state = 'TWIST'
@@ -96,7 +96,7 @@ class TB3MoveActionServer():
         cmd_twist.linear.x = vel_lin
         cmd_twist.angular.z = vel_ang
 
-        self._cmdvel_pub.publish(cmd_twist)
+        self._cmd_vel_pub.publish(cmd_twist)
 
 
     # Funcion para detener al robot
@@ -104,7 +104,7 @@ class TB3MoveActionServer():
         rospy.loginfo('Deteniendo al robot...')
         self._cmd_vel_pub.publish(Twist())
         rospy.sleep(1)
-        self.self._irobot_state_code = 0
+        self._irobot_state_code = 0
 
     ############################################################
     ## Aqui empieza la implementacion de SimpleActionServer   ##
@@ -162,7 +162,7 @@ class TB3MoveActionServer():
         #   0        1       2      3
         # 'STOP', 'TWIST', 'GO', 'GOAL' 
         if self._irobot_state_code == 0 or self._irobot_state_code == 3:
-            self._irobot_state_code == 2
+            self._irobot_state_code = 2
             self._goal = new_goal.target
 
             return True
@@ -199,6 +199,7 @@ class TB3MoveActionServer():
         return result_msg    
 
     def start(self):
+        rospy.loginfo("Server started.")
         self._action_server.start()    
 
 

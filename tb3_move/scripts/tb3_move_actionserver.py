@@ -19,6 +19,7 @@ class TB3MoveActionServer():
         self._itb3_robot_states = ['STOP', 'TWIST', 'GO', 'GOAL']
         # GOAL y variables de control
         self._goal = None
+        self._goal_queue = []
         self._distance_to_goal = 0.0
         self._iyaw_error = 0.0
         self._ang_vel = 0.1     # rads/seg
@@ -63,7 +64,7 @@ class TB3MoveActionServer():
     # Giro en la orientacion (heading)
     def _head_towards_goal(self):
         goal_yaw, dist_to_goal = self._compute_goal()
-        rospy.loginfo(f'HEADING: Yaw err: {goal_yaw:.6f}, dist to go: {dist_to_goal:.6f}')
+        # rospy.loginfo(f'HEADING: Yaw err: {goal_yaw:.6f}, dist to go: {dist_to_goal:.6f}')
         self._iyaw_error = goal_yaw
         self._distance_to_goal = dist_to_goal
         if math.fabs(goal_yaw) > self._tol_err_yaw:
@@ -76,7 +77,7 @@ class TB3MoveActionServer():
     # Desplazamiento hacia la meta
     def _go_staight(self):
         goal_yaw, dist_to_goal = self._compute_goal()    
-        rospy.loginfo(f'GO: Yaw err: {goal_yaw:.6f}, dist to go: {dist_to_goal:.6f}')
+        # rospy.loginfo(f'GO: Yaw err: {goal_yaw:.6f}, dist to go: {dist_to_goal:.6f}')
         self._iyaw_error = goal_yaw
         self._distance_to_goal = dist_to_goal
         if self._irobot_state_code not in [0,3]:        # if self._robot_state not in ['GOAL','STOP']
@@ -84,7 +85,7 @@ class TB3MoveActionServer():
                 self._send_vel_robot(vel_lin=self._lin_vel, robot_state=2) # robot_state='GO'
             else: # Llegamos a la meta
                 self._irobot_state_code = 3      # self._robot_state = 'GOAL'
-                rospy.loginfo(f"GOAL!, yaw error: {goal_yaw:.6f}, dist error: {dist_to_goal:.6f}")
+                # rospy.loginfo(f"GOAL!, yaw error: {goal_yaw:.6f}, dist error: {dist_to_goal:.6f}")
                 self._send_vel_robot(robot_state=3)
             if math.fabs(goal_yaw) > self._tol_err_yaw:
                 #self._head_towards_goal()    
@@ -101,7 +102,7 @@ class TB3MoveActionServer():
 
     # Funcion para detener al robot
     def _stop_robot(self):
-        rospy.loginfo('Deteniendo al robot...')
+        # rospy.loginfo('Deteniendo al robot...')
         self._cmd_vel_pub.publish(Twist())
         rospy.sleep(1)
         self._irobot_state_code = 0
@@ -157,10 +158,14 @@ class TB3MoveActionServer():
             self._action_server.set_preempted(result_msg)
             rospy.logwarn("Proceso terminado, GOAL PREEMPTED")
 
+        # self._goal_queue.pop(0)    
+
     def _accept_goal(self, new_goal):
         # Estados del robot
         #   0        1       2      3
-        # 'STOP', 'TWIST', 'GO', 'GOAL' 
+        # 'STOP', 'TWIST', 'GO', 'GOAL'
+        #  Una vez que se evalue si la nueva meta es válida
+        # self._goal_queue.append(new_goal) 
         if self._irobot_state_code == 0 or self._irobot_state_code == 3:
             self._irobot_state_code = 2
             self._goal = new_goal.target

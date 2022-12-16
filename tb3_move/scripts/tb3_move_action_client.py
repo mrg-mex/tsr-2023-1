@@ -51,8 +51,31 @@ class TB3MoveActionClient():
         )
         rospy.loginfo(formated_msg)
 
-    def _on_done(self):
-        pass
+    def _on_done(self, success_code, msg):
+        elapsed_time = msg.header.stamp - self._goal.header.stamp
+        formated_msg = ("Proceso terminado con estatus [{}] '{}': posicion final({:.6f}, {:.6f}), theta: {:.6f}, Derr:({:.6f}), Yerr:({:.6f})"
+            .format(
+                self.get_state_name(success_code),
+                msg.state_name,
+                msg.position.x,
+                msg.position.y,
+                msg.position.theta,
+                msg.distance_error,
+                msg.yaw_error
+            )
+        )
+        status_msg = f"{msg.goal_message} terminado con estado {self.get_state_name(success_code)}, elapsed time {elapsed_time.to_sec():.6f}"
+
+        if success_code == GoalStatus.SUCCEEDED:
+            rospy.loginfo(status_msg)
+            rospy.loginfo(formated_msg)
+        else:
+            rospy.logwarn(status_msg)
+            rospy.logwarn(formated_msg)       
+
+    def cancel_goal(self):
+        self._action_client.cancel_goal()
+
 
     def get_state_name(self, state_code):
         state_name = ''
@@ -76,6 +99,18 @@ def main():
 
     rospy.init_node('tb3_actionlib_client_node') 
     tb3_move_client = TB3MoveActionClient()
+
+    rospy.loginfo(f"Goal({param_x:.6f}, {param_y:.6f})")
+
+    goal_completed = tb3_move_client.send_goal(param_x, param_y) # Sin tomar en cuenta el tiempo = timeout
+    # goal_completed = tb3_move_client.send_goal(param_x, param_y, 60) Con restriccion de timeout
+
+    if not goal_completed:
+        rospy.logerr(f"PROCCESS FAIL: {tb3_move_client._action_client.get_goal_status_text()}")
+        tb3_move_client.cancel_goal()
+        rospy.logerr("Goal cancelada")
+        sys.exit(1)
+    
 
 
 if __name__ == '__main__':
